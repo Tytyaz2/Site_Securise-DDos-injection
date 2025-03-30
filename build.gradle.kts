@@ -30,8 +30,8 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     implementation("org.postgresql:postgresql")
     implementation("org.springframework.boot:spring-boot-starter-thymeleaf")
-    implementation("org.projectlombok:lombok:1.18.30")
-    annotationProcessor("org.projectlombok:lombok:1.18.30")
+    implementation("org.projectlombok:lombok:1.18.34")
+    annotationProcessor("org.projectlombok:lombok:1.18.34")
     implementation ("org.springframework.session:spring-session-jdbc")
     runtimeOnly ("org.postgresql:postgresql")
 }
