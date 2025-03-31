@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  web-secure-proxy:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    ports:
+      - "8090:80"
+    networks:
+      - secure-net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+networks:
+  secure-net:
