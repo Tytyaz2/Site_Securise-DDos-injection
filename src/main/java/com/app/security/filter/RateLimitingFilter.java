@@ -20,7 +20,7 @@ import jakarta.servlet.http.HttpServletResponse;
 
 public class RateLimitingFilter implements Filter {
 
-    private static final int MAX_REQUESTS_PER_MINUTE = 10;
+    private static final int MAX_REQUESTS_PER_MINUTE = 25;
     private static final long INTERVAL_MILLIS = 60_000; // 1 minute
     private static final long CLEANUP_INTERVAL_MILLIS = 5 * 60_000; // 5 minutes
 
@@ -50,7 +50,9 @@ public class RateLimitingFilter implements Filter {
                 ip -> new SimpleRateLimiter(MAX_REQUESTS_PER_MINUTE, INTERVAL_MILLIS));
 
         if (!limiter.allowRequest()) {
-            ((HttpServletResponse) response).setStatus(429); // HTTP 429 Too Many Requests
+            ((HttpServletResponse) response).setStatus(429);
+            long retryAfterSeconds = (limiter.getRetryAfterMillis() + 999) / 1000; // arrondi vers le haut
+            ((HttpServletResponse) response).setHeader("Retry-After", String.valueOf(retryAfterSeconds));// HTTP 429 Too Many Requests
             response.getWriter().write("Rate limit exceeded. Try again later.");
             return;
         }
