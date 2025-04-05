@@ -1,22 +1,45 @@
-FROM nginx:1.25-alpine
+FROM nginx:1.25.3-alpine
 
 LABEL maintainer="your-team@example.com"
 
 # Install dependencies
+#RUN apk add --no-cache git build-base linux-headers \
+#    libxml2-dev libxslt-dev geoip-dev pcre-dev zlib-dev \
+#    curl openssl-dev yajl-dev libmaxminddb-dev
+
+# resoudre le probléme de non présence par défaut de libtoolize, autoconf, automake.
 RUN apk add --no-cache git build-base linux-headers \
-    libxml2-dev libxslt-dev geoip-dev pcre-dev zlib-dev \
-    curl openssl-dev yajl-dev libmaxminddb-dev
+    libxml2-dev libxslt-dev geoip-dev pcre2-dev zlib-dev \
+    curl openssl-dev yajl-dev libmaxminddb-dev \
+    autoconf automake libtool pkgconfig
+
 
 # Build ModSecurity (v3)
 WORKDIR /opt
-RUN git clone --depth 1 -b v3.0.8 https://github.com/SpiderLabs/ModSecurity && \
+#RUN git clone --depth 1 -b v3.0.8 https://github.com/SpiderLabs/ModSecurity && \
+#    cd ModSecurity && \
+#    git submodule init && \
+#    git submodule update && \
+#    ./build.sh && ./configure && make && make install
+
+# résoudre le probléme que d'installation de modSecurity-nginx avant la construction de NGINX
+# Installer ModSecurity v3
+RUN git clone --depth 1 -b v3/master https://github.com/SpiderLabs/ModSecurity && \
     cd ModSecurity && \
     git submodule init && \
     git submodule update && \
-    ./build.sh && ./configure && make && make install
+    ./build.sh && \
+    ./configure && \
+    make && \
+    make install
+
+
+
 
 # Build ModSecurity-nginx connector
 RUN git clone --depth 1 https://github.com/SpiderLabs/ModSecurity-nginx.git
+
+
 
 # Download and extract nginx source
 ENV NGINX_VERSION=1.25.3
@@ -25,6 +48,17 @@ RUN curl -sSL https://nginx.org/download/nginx-$NGINX_VERSION.tar.gz | tar -xz &
     ./configure --with-compat --add-dynamic-module=../ModSecurity-nginx && \
     make modules && \
     cp objs/ngx_http_modsecurity_module.so /etc/nginx/modules
+
+
+# Create proper directory structure
+RUN mkdir -p /etc/modsecurity
+
+# Copy config to standard location
+COPY modsecurity.conf /etc/modsecurity/modsecurity.conf
+
+# Set proper permissions
+RUN chown -R nginx:nginx /etc/modsecurity && \
+    chmod -R 755 /etc/modsecurity
 
 # Copy configs
 COPY nginx.conf /etc/nginx/nginx.conf

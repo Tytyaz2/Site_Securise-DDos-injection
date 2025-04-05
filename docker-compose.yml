@@ -9,8 +9,15 @@ services:
       - "8090:80"
     networks:
       - secure-net
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    depends_on:
+      - java-app
+
+  java-app:
+    build:
+      context: ./
+      dockerfile: Dockerfile
+    networks:
+      - secure-net
 
 networks:
   secure-net:

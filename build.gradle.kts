@@ -2,6 +2,7 @@ plugins {
     java
     id("org.springframework.boot") version "3.4.3"
     id("io.spring.dependency-management") version "1.1.7"
+    id("application")
 }
 
 group = "java"
@@ -9,7 +10,7 @@ version = "0.0.1-SNAPSHOT"
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(23)
+        languageVersion = JavaLanguageVersion.of(17)
     }
 }
 
@@ -30,10 +31,14 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     implementation("org.postgresql:postgresql")
     implementation("org.springframework.boot:spring-boot-starter-thymeleaf")
-    implementation("org.projectlombok:lombok:1.18.34")
-    annotationProcessor("org.projectlombok:lombok:1.18.34")
+    implementation("org.projectlombok:lombok:1.18.30")
+    annotationProcessor("org.projectlombok:lombok:1.18.30")
     implementation ("org.springframework.session:spring-session-jdbc")
     runtimeOnly ("org.postgresql:postgresql")
+}
+
+application{
+    mainClass.set("com.app.SiteWebSecuriseApplication")
 }
 
 tasks.withType<Test> {
