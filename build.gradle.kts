@@ -2,6 +2,7 @@ plugins {
     java
     id("org.springframework.boot") version "3.4.3"
     id("io.spring.dependency-management") version "1.1.7"
+    id("application")
 }
 
 group = "java"
@@ -34,6 +35,10 @@ dependencies {
     annotationProcessor("org.projectlombok:lombok:1.18.30")
     implementation ("org.springframework.session:spring-session-jdbc")
     runtimeOnly ("org.postgresql:postgresql")
+}
+
+application{
+    mainClass.set("com.app.SiteWebSecuriseApplication")
 }
 
 tasks.withType<Test> {
