@@ -1,5 +1,6 @@
 package com.app.security.service;
 
+import com.app.security.filter.CaptchaValidationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -11,6 +12,7 @@ import org.springframework.security.core.session.SessionRegistryImpl;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
 @EnableWebSecurity
@@ -25,36 +27,40 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
+                .addFilterBefore(new CaptchaValidationFilter(), UsernamePasswordAuthenticationFilter.class)
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/login", "/register").permitAll() // Routes publiques
-                        .requestMatchers("/home", "/home/**").authenticated() // Routes protégées
+                        .requestMatchers("/login", "/register").permitAll()
+                        .requestMatchers("/home", "/home/**").authenticated()
                         .anyRequest().authenticated()
                 )
                 .formLogin(form -> form
-                        .loginPage("/login") // Page de connexion personnalisée
-                        .defaultSuccessUrl("/home", true) // Redirection après connexion réussie
-                        .failureUrl("/login?error=true") // Redirection en cas d'échec
+                        .loginPage("/login")
+                        .defaultSuccessUrl("/home", true)
+                        .failureUrl("/login?error=true")
                         .permitAll()
                 )
                 .logout(logout -> logout
-                        .logoutUrl("/logout") // URL de déconnexion
-                        .logoutSuccessUrl("/login") // Redirection après déconnexion
-                        .invalidateHttpSession(true) // Invalider la session après déconnexion
-                        .deleteCookies("JSESSIONID") // Supprimer le cookie de session
+                        .logoutUrl("/logout")
+                        .logoutSuccessUrl("/login")
+                        .invalidateHttpSession(true)
+                        .deleteCookies("JSESSIONID")
                         .permitAll()
                 )
                 .sessionManagement(session -> session
-                        .sessionFixation().migrateSession() // Protège contre les attaques de fixation de session
-                        .maximumSessions(1) // Limite à une session par utilisateur
+                        .sessionFixation().migrateSession()
+                        .maximumSessions(1)
                         .sessionRegistry(sessionRegistry())
-                        .expiredUrl("/login?expired") // Redirection si la session expire
+                        .expiredUrl("/login?expired")
                 );
+
         return http.build();
     }
+
     @Bean
     public SessionRegistry sessionRegistry() {
         return new SessionRegistryImpl();
     }
+
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
