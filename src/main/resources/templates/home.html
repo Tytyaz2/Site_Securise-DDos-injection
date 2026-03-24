@@ -1,25 +1,56 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html xmlns:th="http://www.thymeleaf.org" lang="fr">
 <head>
-    <title>Accueil</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mes Notes — Site Sécurisé</title>
     <link rel="stylesheet" th:href="@{/styles.css}">
 </head>
 <body>
 <h1>Mes Notes</h1>
-<a href="/logout">Déconnexion</a>
 
-<!-- Formulaire pour ajouter une note -->
-<form action="/home/add" method="post">
-    <input type="text" name="title" placeholder="Titre" required>
-    <textarea name="content" placeholder="Contenu" required></textarea>
-    <button type="submit">Ajouter une note</button>
+<!--
+    SECURITY: Logout must use POST with a CSRF token to prevent logout CSRF
+    attacks (where a malicious third-party page forces the user to log out).
+    A GET /logout link would allow any site to trigger logout via an <img> tag.
+-->
+<form th:action="@{/logout}" method="post" style="display:inline;">
     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+    <button type="submit" class="btn-cancel">Déconnexion</button>
 </form>
 
-<!-- Liste des notes -->
+<!-- Flash messages (success / error) -->
+<p th:if="${message}" th:text="${message}" class="message success"></p>
+<p th:if="${errorMessage}" th:text="${errorMessage}" class="message error"></p>
+
+<!-- Add note form -->
+<form th:action="@{/home/add}" method="post">
+    <!-- CSRF token — required by Spring Security -->
+    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+
+    <input type="text"
+           name="title"
+           placeholder="Titre"
+           maxlength="200"
+           required>
+
+    <textarea name="content"
+              placeholder="Contenu"
+              maxlength="10000"
+              required></textarea>
+
+    <button type="submit">Ajouter une note</button>
+</form>
+
+<!-- Notes list -->
+<!--
+    SECURITY: th:text auto-escapes output — note.title is never rendered as raw HTML.
+    th:href with @{} uses Thymeleaf's URL builder which encodes special characters.
+-->
 <ul>
     <li th:each="note : ${notes}">
-        <a th:href="@{/home/note/{id}(id=${note.id})}" th:text="${note.title}"></a>
+        <a th:href="@{/home/note/{id}(id=${note.id})}"
+           th:text="${note.title}"></a>
     </li>
 </ul>
 </body>

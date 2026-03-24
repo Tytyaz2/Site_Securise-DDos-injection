@@ -1,40 +1,71 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html xmlns:th="http://www.thymeleaf.org" lang="fr">
 <head>
-    <title>Note</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="'Note — ' + ${note.title}">Note</title>
     <link rel="stylesheet" th:href="@{/styles.css}">
 </head>
 <body>
 <div class="note-container">
-    <!-- Mode Lecture -->
+    <!-- View mode -->
     <div id="view-mode">
+        <!--
+            SECURITY: th:text escapes all HTML special characters.
+            Never use th:utext here — note content is user-supplied.
+        -->
         <h1 th:text="${note.title}"></h1>
         <div class="note-content">
             <p id="note-content-view" th:text="${note.content}"></p>
         </div>
         <div class="note-meta">
-            <p>Créée le : <span th:text="${#temporals.format(note.createdAt, 'dd/MM à HH:mm')}"></span></p>
+            <p>Créée le :
+                <span th:text="${#temporals.format(note.createdAt, 'dd/MM à HH:mm')}"></span>
+            </p>
         </div>
         <button id="edit-button" class="btn-edit">Modifier la note</button>
         <a href="/home" class="btn-back">Retour à l'accueil</a>
     </div>
 
-    <!-- Mode Édition -->
+    <!-- Edit mode (hidden by default) -->
     <div id="edit-mode" style="display: none;">
-        <h1><input type="text" id="note-title-edit" th:value="${note.title}" class="edit-input"></h1>
+        <h1>
+            <input type="text"
+                   id="note-title-edit"
+                   th:value="${note.title}"
+                   class="edit-input"
+                   maxlength="200">
+        </h1>
         <div class="note-content">
-            <textarea id="note-content-edit" class="edit-textarea" th:text="${note.content}"></textarea>
+            <textarea id="note-content-edit"
+                      class="edit-textarea"
+                      maxlength="10000"
+                      th:text="${note.content}"></textarea>
         </div>
         <div class="note-meta">
-            <p>Créée le : <span th:text="${#temporals.format(note.createdAt, 'dd/MM à HH:mm')}"></span></p>
+            <p>Créée le :
+                <span th:text="${#temporals.format(note.createdAt, 'dd/MM à HH:mm')}"></span>
+            </p>
         </div>
         <button id="save-button" class="btn-save">Enregistrer</button>
         <button id="cancel-button" class="btn-cancel">Annuler</button>
     </div>
 
-    <!-- Formulaire caché pour la soumission sécurisée -->
-    <form id="save-note-form" th:action="@{/notes/{id}/edit(id=${note.id})}" method="post" style="display: none;">
-        <input type="hidden" id="csrf-token" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+    <!--
+        Hidden form for CSRF-protected AJAX submission.
+        SECURITY:
+        - th:action uses Thymeleaf URL builder (no open redirect risk).
+        - CSRF token is included via th:name / th:value.
+        - The form is submitted via fetch() with the CSRF header; Spring Security
+          accepts CSRF both as a form parameter and as X-CSRF-TOKEN header.
+    -->
+    <form id="save-note-form"
+          th:action="@{/notes/{id}/edit(id=${note.id})}"
+          method="post"
+          style="display: none;">
+        <input type="hidden" id="csrf-token"
+               th:name="${_csrf.parameterName}"
+               th:value="${_csrf.token}">
         <input type="hidden" id="note-id" th:value="${note.id}">
         <input type="hidden" id="updated-title" name="title">
         <input type="hidden" id="updated-content" name="content">
@@ -42,7 +73,11 @@
 </div>
 
 <script>
-    // Basculer entre les modes "lecture" et "édition"
+    /*
+     * SECURITY: No innerHTML or document.write() calls.
+     * All DOM updates use textContent (which does not parse HTML), preventing
+     * stored XSS even if the server were to return unescaped content.
+     */
     const viewMode = document.getElementById('view-mode');
     const editMode = document.getElementById('edit-mode');
     const editButton = document.getElementById('edit-button');
@@ -51,8 +86,6 @@
     const noteTitleEdit = document.getElementById('note-title-edit');
     const noteContentEdit = document.getElementById('note-content-edit');
     const noteContentView = document.getElementById('note-content-view');
-
-    // Éléments du formulaire caché
     const saveNoteForm = document.getElementById('save-note-form');
     const updatedTitleInput = document.getElementById('updated-title');
     const updatedContentInput = document.getElementById('updated-content');
@@ -69,34 +102,44 @@
     });
 
     saveButton.addEventListener('click', async () => {
-        // Récupérer les valeurs modifiées
-        const updatedTitle = noteTitleEdit.value;
-        const updatedContent = noteContentEdit.value;
+        const updatedTitle = noteTitleEdit.value.trim();
+        const updatedContent = noteContentEdit.value.trim();
 
-        // Mettre à jour le contenu en mode lecture
-        document.querySelector('h1').textContent = updatedTitle;
+        // Client-side length guard (mirrors server-side validation)
+        if (updatedTitle.length === 0 || updatedTitle.length > 200) {
+            alert('Le titre doit contenir entre 1 et 200 caractères.');
+            return;
+        }
+        if (updatedContent.length === 0 || updatedContent.length > 10000) {
+            alert('Le contenu doit contenir entre 1 et 10 000 caractères.');
+            return;
+        }
+
+        // Update view mode using textContent — never innerHTML (XSS prevention)
+        document.querySelector('#view-mode h1').textContent = updatedTitle;
         noteContentView.textContent = updatedContent;
 
-        // Basculer en mode lecture
         editMode.style.display = 'none';
         viewMode.style.display = 'block';
 
-        // Préparer les données pour la requête
+        // Populate hidden form fields and submit via fetch
         updatedTitleInput.value = updatedTitle;
         updatedContentInput.value = updatedContent;
 
-        // Envoyer la requête AJAX
         try {
             const response = await fetch(saveNoteForm.action, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
-                    'X-CSRF-TOKEN': csrfTokenInput.value, // Inclure le token CSRF
+                    'X-CSRF-TOKEN': csrfTokenInput.value
                 },
-                body: new URLSearchParams(new FormData(saveNoteForm)),
-            });i
+                body: new URLSearchParams(new FormData(saveNoteForm))
+            });
+            if (!response.ok) {
+                console.error('Save failed with status:', response.status);
+            }
         } catch (error) {
-            console.error('Erreur:', error);
+            console.error('Network error during save:', error.message);
         }
     });
 </script>

@@ -1,21 +1,40 @@
 package com.app.controller;
 
+import com.app.security.service.NoteService;
 import com.app.security.service.UserService;
 import com.app.security.tableBDD.Note;
 import com.app.security.tableBDD.User;
-import com.app.security.service.NoteService;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.security.Principal;
 import java.util.List;
-import java.util.Optional;
 
+/**
+ * Controller for the home page and note creation.
+ *
+ * SECURITY:
+ * - All note inputs are validated for length/blank before reaching the service.
+ * - The authenticated user is always resolved from the security principal, not
+ *   from a request parameter, preventing IDOR on note creation.
+ * - Uses SLF4J for logging; never logs raw user-supplied content.
+ */
 @Controller
+@Validated
 public class HomeController {
+
+    private static final Logger log = LoggerFactory.getLogger(HomeController.class);
+
+    // Maximum sizes mirroring the @Size constraints on Note entity
+    private static final int MAX_TITLE_LENGTH = 200;
+    private static final int MAX_CONTENT_LENGTH = 10000;
 
     private final NoteService noteService;
     private final UserService userService;
@@ -24,20 +43,18 @@ public class HomeController {
         this.noteService = noteService;
         this.userService = userService;
     }
+
     @GetMapping("/home")
     public String home(Principal principal, Model model) {
         if (principal == null) {
-            return "redirect:/login";  // Rediriger vers la page de connexion si l'utilisateur n'est pas authentifié
+            return "redirect:/login";
         }
 
-        String username = principal.getName();
-        User user = userService.findByUsername(username);  // Récupérer l'utilisateur complet
-
+        User user = userService.findByUsername(principal.getName());
         if (user == null) {
-            return "redirect:/login";  // Rediriger si l'utilisateur n'est pas trouvé
+            return "redirect:/login";
         }
 
-        // Récupérer les notes de l'utilisateur
         List<Note> notes = noteService.getNotesByUser(user);
         model.addAttribute("notes", notes);
         return "home";
@@ -45,19 +62,31 @@ public class HomeController {
 
     @PostMapping("/home/add")
     public String addNote(
-            @RequestParam String title,
-            @RequestParam String content,
+            @RequestParam @NotBlank @Size(min = 1, max = MAX_TITLE_LENGTH) String title,
+            @RequestParam @NotBlank @Size(min = 1, max = MAX_CONTENT_LENGTH) String content,
             Principal principal,
             RedirectAttributes redirectAttributes) {
+
         if (principal == null) {
-            return "redirect:/login";  // Rediriger vers la page de connexion si l'utilisateur n'est pas authentifié
+            return "redirect:/login";
         }
-        String username = principal.getName();
-        User user = userService.findByUsername(username);  // Récupérer l'utilisateur complet
+
+        // Validate sizes explicitly at controller level as an extra layer of defence
+        if (title.length() > MAX_TITLE_LENGTH || content.length() > MAX_CONTENT_LENGTH) {
+            log.warn("Note creation rejected: input exceeds maximum allowed size for user={}",
+                    principal.getName());
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    "Le titre ou le contenu dépasse la taille maximale autorisée.");
+            return "redirect:/home";
+        }
+
+        User user = userService.findByUsername(principal.getName());
         if (user == null) {
-            return "redirect:/login";  // Rediriger si l'utilisateur n'est pas trouvé
+            return "redirect:/login";
         }
+
         noteService.createNote(title, content, user);
+        log.info("Note created by user={}", principal.getName());
         redirectAttributes.addFlashAttribute("message", "Note ajoutée avec succès !");
         return "redirect:/home";
     }
@@ -65,31 +94,25 @@ public class HomeController {
     @GetMapping("/home/note/{id}")
     public String editNoteForm(@PathVariable Long id, Model model, Principal principal) {
         if (principal == null) {
-            return "redirect:/login";  // Rediriger vers la page de connexion si l'utilisateur n'est pas authentifié
+            return "redirect:/login";
         }
 
-        // Récupérer la note par son ID
         Note note = noteService.getNoteById(id);
-
-        if (note== null) {
-            return "redirect:/home";  // Rediriger vers la page d'accueil si la note n'est pas trouvée
+        if (note == null) {
+            return "redirect:/home";
         }
 
-        // Vérifier que l'utilisateur est bien le propriétaire de la note
-        String username = principal.getName();
-        if (!note.getUser().getUsername().equals(username)) {
-            return "redirect:/home";  // Rediriger si l'utilisateur n'est pas autorisé à modifier cette note
+        // SECURITY: enforce ownership — never expose another user's note
+        if (!note.getUser().getUsername().equals(principal.getName())) {
+            log.warn("Unauthorized note access attempt: user={} tried to access note={}",
+                    principal.getName(), id);
+            return "redirect:/home";
         }
 
-        // Ajouter la note au modèle
         model.addAttribute("note", note);
-        return "note";  // Retourner la vue pour modifier la note
+        return "note";
     }
 
-    @GetMapping("/logout")
-    public String logout(
-
-    ) {
-        return "redirect:/login";
-    }
+    // The GET /logout mapping is removed — Spring Security handles /logout via POST
+    // with CSRF protection. A GET /logout would bypass CSRF and allow logout CSRF attacks.
 }

@@ -1,25 +1,69 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html xmlns:th="http://www.thymeleaf.org" lang="fr">
 <head>
-  <title>Login</title>
-  <link rel="stylesheet" th:href="@{/styles.css}">
-  <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connexion — Site Sécurisé</title>
+    <link rel="stylesheet" th:href="@{/styles.css}">
+    <!--
+        SECURITY: reCAPTCHA JS is loaded from Google's CDN.
+        The Content-Security-Policy header set by SecurityConfig allows
+        https://www.google.com/recaptcha/ and https://www.gstatic.com/recaptcha/
+        in script-src, so this tag is CSP-compliant.
+    -->
+    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
 </head>
 <body>
 <h2>Connexion</h2>
-<p th:if="${param.error} and ${param.error[0]} == 'captcha'" style="color: red;">
-  Veuillez valider le captcha pour continuer.
+
+<!--
+    SECURITY: th:text escapes HTML entities — no raw output of user-supplied
+    or server-supplied strings via th:utext anywhere in this file.
+-->
+
+<!-- Generic login error (bad credentials, Spring Security) -->
+<p th:if="${param.error != null and param.error[0] == 'true'}"
+   style="color: red;">
+    Identifiants incorrects. Veuillez réessayer.
 </p>
+
+<!-- CAPTCHA-specific error -->
+<p th:if="${param.error != null and param.error[0] == 'captcha'}"
+   style="color: red;">
+    Veuillez valider le captcha pour continuer.
+</p>
+
+<!-- Session expired -->
+<p th:if="${param.expired != null}" style="color: orange;">
+    Votre session a expiré. Veuillez vous reconnecter.
+</p>
+
 <form th:action="@{/login}" method="post">
-  <input type="text" name="username" placeholder="Username" required>
-  <input type="password" name="password" placeholder="Password" required>
+    <!-- CSRF token — required; Spring Security rejects POST without it -->
+    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
 
-  <div class="g-recaptcha" data-sitekey="6LcuUAsrAAAAAJgwBlmdr655sNHgVhzyOkEm2kj_"></div>
+    <input type="text"
+           name="username"
+           placeholder="Nom d'utilisateur"
+           autocomplete="username"
+           maxlength="50"
+           required>
 
-  <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
-  <button type="submit">Se connecter</button>
+    <input type="password"
+           name="password"
+           placeholder="Mot de passe"
+           autocomplete="current-password"
+           maxlength="100"
+           required>
+
+    <!--
+        reCAPTCHA widget.
+        Site key is the PUBLIC key — safe to embed in HTML.
+        The SECRET key is stored server-side only (env var RECAPTCHA_SECRET_KEY).
+    -->
+    <div class="g-recaptcha" data-sitekey="6LcuUAsrAAAAAJgwBlmdr655sNHgVhzyOkEm2kj_"></div>
+
+    <button type="submit">Se connecter</button>
 </form>
-
-<p th:if="${captchaError}" th:text="${captchaError}" style="color:red;"></p>
 </body>
 </html>
