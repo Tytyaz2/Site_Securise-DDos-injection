@@ -13,8 +13,9 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
-import org.springframework.security.web.header.writers.XXssProtectionHeaderWriter;
+import org.springframework.security.web.header.writers.StaticHeadersWriter;
 
 @Configuration
 @EnableWebSecurity
@@ -51,13 +52,6 @@ public class SecurityConfig {
                 .referrerPolicy(referrer ->
                     referrer.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN)
                 )
-                // Permissions-Policy: disable access to sensitive browser features
-                .permissionsPolicy(permissions ->
-                    permissions.policy(
-                        "camera=(), microphone=(), geolocation=(), payment=(), usb=(), " +
-                        "interest-cohort=()"
-                    )
-                )
                 // Content-Security-Policy
                 // - default-src 'self': only same-origin by default
                 // - script-src: allow same-origin + Google reCAPTCHA
@@ -82,16 +76,19 @@ public class SecurityConfig {
                         "frame-ancestors 'none';"
                     )
                 )
+                // Permissions-Policy: disable access to sensitive browser features
+                // Using StaticHeadersWriter as the lambda-based permissionsPolicy API
+                // was deprecated and removed in Spring Security 6.4+
+                .addHeaderWriter(new StaticHeadersWriter("Permissions-Policy",
+                    "camera=(), microphone=(), geolocation=(), payment=(), usb=(), " +
+                    "interest-cohort=()"))
             )
 
             // ---------------------------------------------------------------
             // CSRF protection — explicitly enabled (Spring Security default)
+            // The token is injected via th:name/${_csrf} in all Thymeleaf forms.
             // ---------------------------------------------------------------
-            .csrf(csrf -> csrf
-                // CSRF is enabled by default; this block makes it explicit and
-                // configures the token to also be readable as a header (for AJAX).
-                // The token is already injected via th:name/${_csrf} in all forms.
-            )
+            .csrf(Customizer.withDefaults())
 
             // ---------------------------------------------------------------
             // Filters
